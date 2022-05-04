@@ -48,7 +48,7 @@ docker-compose up -d
 
 You can access it via `http://localhost`.
 
-##Default configuration summary:
+## Default configuration summary:
 
 ### Credentials:
 
