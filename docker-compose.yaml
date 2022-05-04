@@ -1,0 +1,150 @@
+version: "3.8"
+
+services:
+  ###
+  mysql_database:
+    build: ./bin/${DATABASE}
+    container_name: '${DATABASE}-${COMPOSE_PROJECT_NAME}'
+    restart: always
+    ports:
+      - "${HOST_MACHINE_MYSQL_PORT}:3306"
+    volumes:
+      - ${MYSQL_INITDB_DIR-./config/initdb}:/docker-entrypoint-initdb.d
+      - ${MYSQL_LOG_DIR-./logs/mysql}:/var/log/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    networks:
+      - network-lamp
+  ###
+  phpmyadmin:
+    depends_on:
+      - mysql_database
+    image: phpmyadmin/phpmyadmin
+    container_name: 'phpmyadmin-${COMPOSE_PROJECT_NAME}'
+    restart: always
+    ports:
+      - "${HOST_MACHINE_PMA_PORT}:80"
+    environment:
+      PMA_HOST: database
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    networks:
+      - network-lamp
+  ###
+  postgres:
+    container_name: 'postgres-${COMPOSE_PROJECT_NAME}'
+    image: postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PGDATA: /data/postgres
+    volumes:
+      - ${POSTGRES_DATA_DIR-./data/postgres}:/var/lib/postgresql/data
+      - ${LOG_DIR-./logs/postgresql}:/var/log/postgresql
+    ports:
+      - "${HOST_MACHINE_PGSQL_PORT}:5432"
+    networks:
+      - network-lamp
+    restart: always
+  ###
+  pgadmin:
+    container_name: 'pgadmin-${COMPOSE_PROJECT_NAME}'
+    restart: always
+    image: dpage/pgadmin4
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    volumes:
+      - pgadmin:/var/lib/pgadmin
+    ports:
+      - "${PG_SQL_ADMIN_PORT}:80"
+    networks:
+      - network-lamp
+  ###
+  redis:
+    container_name: 'redis-${COMPOSE_PROJECT_NAME}'
+    restart: always
+    image: redis:latest
+    ports:
+      - "${HOST_MACHINE_REDIS_PORT}:6379"
+    networks:
+      - network-lamp
+  ###
+  webserver-apache:
+    build: ./bin/${PHPVERSION}
+    container_name: '${PHPVERSION}-apache2-${COMPOSE_PROJECT_NAME}'
+    restart: always
+    ports:
+      - "${APACHE_HTTP_PORT}:80"
+      - "${APACHE_HTTPS_SSL_PORT}:443"
+    volumes: 
+      - ${LOCAL_MACHINE_WEB_APP_DIR-./www}:/var/www/html
+      - ${PHP_INI-./config/php/php.ini}:/usr/local/etc/php/php.ini
+      - ${VHOSTS_DIR-./config/vhosts}:/etc/apache2/sites-enabled
+      - ${LOG_DIR-./logs/apache2}:/var/log/apache2
+    environment:
+      REMOTE_MACHINE_WEB_APP_DIR: ${REMOTE_MACHINE_WEB_APP_DIR}
+      PMA_PORT: ${HOST_MACHINE_PMA_PORT}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      # mysql credentials
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      # postgres  credentials
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    networks:
+      - network-lamp
+    ###
+  php-fpm:
+    depends_on:
+      - mysql_database
+    build: ./bin/${PHPFPMVERSION}
+    container_name: 'phpfpm-${COMPOSE_PROJECT_NAME}'
+    restart: always
+    volumes:
+      - ${LOCAL_MACHINE_WEB_APP_DIR-./www}:/var/www/html
+    environment:
+      PMA_PORT: ${HOST_MACHINE_PMA_PORT}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      # mysql credentials
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      # postgres  credentials
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    networks:
+      - network-lamp
+  ###
+  webserver-nginx:
+    build: ./bin/${NGINX_HTTP_VERSION}
+    container_name: 'nginx-${COMPOSE_PROJECT_NAME}'
+    restart: always
+    depends_on:
+      - php-fpm
+    volumes:
+      - ./bin/${NGINX_HTTP_VERSION}/nginx.conf:/etc/nginx/template/nginx.conf:ro
+      - ./bin/${NGINX_HTTP_VERSION}/nginx-proxy.conf:/etc/nginx/cond.d/proxypass.conf:ro
+      - ./bin/${NGINX_HTTP_VERSION}/nginx-redirect.conf:/etc/nginx/cond.d/redirect.conf:ro
+      - ${LOCAL_MACHINE_WEB_APP_DIR-./www}:/var/www/html
+      - ${LOG_DIR-./logs/nginx}:/var/log/nginx
+    environment:
+      PHP_FPM_CONTAINER_NAME: 'phpfpm-${COMPOSE_PROJECT_NAME}'
+      REMOTE_MACHINE_WEB_APP_DIR: '${REMOTE_MACHINE_WEB_APP_DIR}'
+    command: [
+        "/bin/bash", "-c",
+        "envsubst '$${PHP_FPM_CONTAINER_NAME},$${REMOTE_MACHINE_WEB_APP_DIR}' < /etc/nginx/template/nginx.conf > /etc/nginx/nginx.conf  && nginx -g 'daemon off;'"
+    ]
+    ports:
+      - "${NGINX_HTTP_PORT}:80"
+      - "${NGINX_HTTPS_SSL_PORT}:443"
+    networks:
+      - network-lamp
+networks:
+  network-lamp:
+    name: network-${COMPOSE_PROJECT_NAME}
+
+volumes:
+  pgadmin:
