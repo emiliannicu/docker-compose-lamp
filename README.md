@@ -1,4 +1,4 @@
-#  LAMP stack built with Docker Compose
+#  LAMP / LNMP / LAPP  stack built with Docker Compose
 
 
 A LAMP stack environment built using Docker Compose. It consists of the following:
