@@ -24,7 +24,6 @@ Available PHP versions. Use appropriate php version as needed:
 * 7.3
 * 7.4
 * 8.0.18
-* 
 
 Available PHP-FPM versions. Use appropriate php version as needed:
 
