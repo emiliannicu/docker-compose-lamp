@@ -50,13 +50,13 @@ You can access it via `http://localhost`.
 
 ##Default configuration summary:
 
-###Credentials:
+### Credentials:
 
 **username**:``docker``
 
 **password**: ``dockerpass``
 
-###Services configuration:
+### Services configuration:
 
 Apache http:
 ``http://localhost``
