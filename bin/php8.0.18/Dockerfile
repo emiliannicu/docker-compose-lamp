@@ -38,6 +38,9 @@ openssl && \
     rm -rf /var/lib/apt/lists/* && \
     curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
+# PATH environment variable for composer
+RUN echo 'export PATH="$PATH:$HOME/.composer/vendor/bin"' >> ~/.bashrc
+
 # Install xdebug
 RUN pecl install xdebug-3.0.0 && \
     docker-php-ext-enable xdebug
